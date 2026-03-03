@@ -11,6 +11,146 @@ import {
   RegisteredGroup,
 } from '../types.js';
 
+/**
+ * Convert Markdown text to Feishu post message format.
+ *
+ * Feishu post format:
+ * {
+ *   "zh_cn": {
+ *     "title": "optional title",
+ *     "content": [[{tag, text, ...}], ...]
+ *   }
+ * }
+ *
+ * Supported tags: text, a, at, img, media
+ * Supported styles: bold, italic, underline, lineThrough
+ *
+ * Markdown support:
+ * - Headings (# ## ### etc.) → bold text
+ * - Bold (**text** or __text__)
+ * - Italic (*text* or _text_)
+ * - Strikethrough (~~text~~)
+ * - Inline code (`code`)
+ * - Code blocks (```)
+ * - Links [text](url)
+ */
+function markdownToPost(text: string): string {
+  const lines = text.split('\n');
+  const content: PostNode[][] = [];
+  let inCodeBlock = false;
+
+  for (const line of lines) {
+    // Check for code block start/end
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        // End of code block
+        content.push([{ tag: 'text', text: '```' }]);
+        inCodeBlock = false;
+      } else {
+        // Start of code block (may include language)
+        content.push([{ tag: 'text', text: line }]);
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    // Inside code block - preserve as-is
+    if (inCodeBlock) {
+      content.push([{ tag: 'text', text: line }]);
+      continue;
+    }
+
+    content.push(parseLine(line));
+  }
+
+  return JSON.stringify({ zh_cn: { content } });
+}
+
+interface PostNode {
+  tag: string;
+  text?: string;
+  style?: string[];
+  href?: string;
+}
+
+/**
+ * Parse a single line, handling headings and inline elements.
+ */
+function parseLine(line: string): PostNode[] {
+  // Check for heading (# ## ### etc.)
+  const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+  if (headingMatch) {
+    // Convert heading to bold text
+    const headingText = headingMatch[2].trim();
+    return [{ tag: 'text', text: headingText, style: ['bold'] }];
+  }
+
+  return parseInlineElements(line);
+}
+
+function parseInlineElements(line: string): PostNode[] {
+  const nodes: PostNode[] = [];
+  let remaining = line;
+
+  // Patterns for inline elements (order matters - more specific patterns first)
+  const patterns = [
+    // Code blocks (inline `code`) - must be before italic
+    { regex: /`([^`]+)`/, tag: 'text', code: true },
+    // Bold (**text** or __text__)
+    { regex: /\*\*([^*]+)\*\*/, tag: 'text', style: ['bold'] },
+    { regex: /__([^_]+)__/, tag: 'text', style: ['bold'] },
+    // Links [text](url) - must be before italic
+    { regex: /\[([^\]]+)\]\(([^)]+)\)/, tag: 'a' },
+    // Italic (*text* or _text_) - use single char patterns
+    { regex: /\*([^*]+)\*/, tag: 'text', style: ['italic'] },
+    { regex: /_([^_]+)_/, tag: 'text', style: ['italic'] },
+    // Strikethrough (~~text~~)
+    { regex: /~~([^~]+)~~/, tag: 'text', style: ['lineThrough'] },
+  ];
+
+  while (remaining.length > 0) {
+    let earliestMatch: { index: number; length: number; node: PostNode } | null = null;
+
+    for (const pattern of patterns) {
+      const match = remaining.match(pattern.regex);
+      if (match && match.index !== undefined) {
+        if (!earliestMatch || match.index < earliestMatch.index) {
+          const node: PostNode = { tag: pattern.tag };
+          if (pattern.tag === 'a') {
+            node.text = match[1];
+            node.href = match[2];
+          } else {
+            node.text = match[1];
+            if (pattern.style) node.style = pattern.style;
+            if (pattern.code) {
+              // Code style: use italic to distinguish
+              node.style = ['italic'];
+            }
+          }
+          earliestMatch = { index: match.index, length: match[0].length, node };
+        }
+      }
+    }
+
+    if (earliestMatch) {
+      // Add plain text before the match
+      if (earliestMatch.index > 0) {
+        nodes.push({ tag: 'text', text: remaining.slice(0, earliestMatch.index) });
+      }
+      nodes.push(earliestMatch.node);
+      remaining = remaining.slice(earliestMatch.index + earliestMatch.length);
+    } else {
+      // No more matches, add remaining as plain text
+      if (remaining.length > 0) {
+        nodes.push({ tag: 'text', text: remaining });
+      }
+      break;
+    }
+  }
+
+  return nodes.length > 0 ? nodes : [{ tag: 'text', text: '' }];
+}
+
 export interface FeishuChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -267,6 +407,28 @@ export class FeishuChannel implements Channel {
     return chatId;
   }
 
+  /**
+   * Check if text contains Markdown formatting that would benefit from post format.
+   */
+  private hasMarkdown(text: string): boolean {
+    // Check for common Markdown patterns
+    const markdownPatterns = [
+      /\*\*[^*]+\*\*/,       // **bold**
+      /__[^_]+__/,           // __bold__
+      /\*[^*]+\*/,           // *italic*
+      /_[^_]+_/,             // _italic_
+      /~~[^~]+~~/,           // ~~strikethrough~~
+      /`[^`]+`/,             // `code`
+      /\[[^\]]+\]\([^)]+\)/, // [link](url)
+      /^#{1,6}\s/,           // # heading
+      /^[-*+]\s/,            // - list item
+      /^\d+\.\s/,            // 1. list item
+      /^>\s/,                // > quote
+      /^```/,                // code block
+    ];
+    return markdownPatterns.some(p => p.test(text));
+  }
+
   async sendMessage(jid: string, text: string): Promise<void> {
     if (!this.wsClient) {
       logger.warn('Feishu bot not initialized');
@@ -275,15 +437,30 @@ export class FeishuChannel implements Channel {
 
     try {
       const chatId = jid.replace(/^feishu:/, '');
-      await this.client.im.v1.message.create({
-        params: { receive_id_type: 'chat_id' },
-        data: {
-          receive_id: chatId,
-          content: JSON.stringify({ text }),
-          msg_type: 'text',
-        },
-      });
-      logger.info({ jid, length: text.length }, 'Feishu message sent');
+
+      // Use post format for messages with Markdown, plain text otherwise
+      if (this.hasMarkdown(text)) {
+        const postContent = markdownToPost(text);
+        await this.client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: chatId,
+            content: postContent,
+            msg_type: 'post',
+          },
+        });
+        logger.info({ jid, length: text.length, format: 'post' }, 'Feishu message sent');
+      } else {
+        await this.client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: chatId,
+            content: JSON.stringify({ text }),
+            msg_type: 'text',
+          },
+        });
+        logger.info({ jid, length: text.length, format: 'text' }, 'Feishu message sent');
+      }
     } catch (err) {
       logger.error({ jid, err }, 'Failed to send Feishu message');
     }

@@ -208,6 +208,26 @@ tail -f logs/nanoclaw.log
 
 Look for `Feishu bot connected` and `Feishu message stored` entries.
 
+## Features
+
+### Markdown Support
+
+The Feishu channel automatically converts Markdown formatting to Feishu's rich text (post) format when sending messages. Supported Markdown syntax:
+
+| Markdown | Feishu Format |
+|----------|---------------|
+| `# Heading` | Bold text |
+| `**bold**` | Bold text |
+| `__bold__` | Bold text |
+| `*italic*` | Italic text |
+| `_italic_` | Italic text |
+| `~~strikethrough~~` | Strikethrough |
+| `` `code` `` | Italic (code style) |
+| `[text](url)` | Hyperlink |
+| ` ``` ` code blocks | Preserved as-is |
+
+Plain text messages without Markdown are sent as simple text messages for efficiency.
+
 ## Troubleshooting
 
 ### Bot not responding
