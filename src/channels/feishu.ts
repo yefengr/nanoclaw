@@ -41,6 +41,8 @@ export class FeishuChannel implements Channel {
   private botOpenId: string = '';
   // Cache chat names to avoid repeated API calls
   private chatNameCache = new Map<string, string>();
+  // Dedup: track recently seen message IDs to prevent duplicate processing
+  private recentMsgIds = new Set<string>();
 
   constructor(appId: string, appSecret: string, opts: FeishuChannelOpts) {
     this.client = new Lark.Client({ appId, appSecret });
@@ -94,6 +96,16 @@ export class FeishuChannel implements Channel {
     const rawContent = message.content || '{}';
     const mentions: any[] = message.mentions || [];
     const createTime = message.create_time; // millisecond timestamp string
+
+    // Deduplicate: skip if we've already processed this message recently
+    if (msgId && this.recentMsgIds.has(msgId)) {
+      logger.debug({ msgId, chatId }, 'Duplicate Feishu event, skipping');
+      return;
+    }
+    if (msgId) {
+      this.recentMsgIds.add(msgId);
+      setTimeout(() => this.recentMsgIds.delete(msgId), 10_000);
+    }
 
     const chatJid = `feishu:${chatId}`;
     const timestamp = createTime
