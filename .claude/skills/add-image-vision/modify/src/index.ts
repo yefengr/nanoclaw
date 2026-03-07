@@ -3,10 +3,8 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
-  DATA_DIR,
   IDLE_TIMEOUT,
   POLL_INTERVAL,
-  TIMEZONE,
   TRIGGER_PATTERN,
 } from './config.js';
 import './channels/index.js';
@@ -31,7 +29,6 @@ import {
   getAllTasks,
   getMessagesSince,
   getNewMessages,
-  getRegisteredGroup,
   getRouterState,
   initDatabase,
   setRegisteredGroup,
@@ -52,6 +49,7 @@ import {
 } from './sender-allowlist.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
+import { parseImageReferences } from './image.js';
 import { logger } from './logger.js';
 
 // Re-export for backwards compatibility during refactor
@@ -173,7 +171,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages, TIMEZONE);
+  const prompt = formatMessages(missedMessages);
+  const imageAttachments = parseImageReferences(missedMessages);
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
@@ -205,7 +204,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   let hadError = false;
   let outputSentToUser = false;
 
-  const output = await runAgent(group, prompt, chatJid, async (result) => {
+  const output = await runAgent(group, prompt, chatJid, imageAttachments, async (result) => {
     // Streaming output callback — called for each agent result
     if (result.result) {
       const raw =
@@ -262,6 +261,7 @@ async function runAgent(
   group: RegisteredGroup,
   prompt: string,
   chatJid: string,
+  imageAttachments: Array<{ relativePath: string; mediaType: string }>,
   onOutput?: (output: ContainerOutput) => Promise<void>,
 ): Promise<'success' | 'error'> {
   const isMain = group.isMain === true;
@@ -313,6 +313,7 @@ async function runAgent(
         chatJid,
         isMain,
         assistantName: ASSISTANT_NAME,
+        ...(imageAttachments.length > 0 && { imageAttachments }),
       },
       (proc, containerName) =>
         queue.registerProcess(chatJid, proc, containerName, group.folder),
@@ -411,7 +412,7 @@ async function startMessageLoop(): Promise<void> {
           );
           const messagesToSend =
             allPending.length > 0 ? allPending : groupMessages;
-          const formatted = formatMessages(messagesToSend, TIMEZONE);
+          const formatted = formatMessages(messagesToSend);
 
           if (queue.sendMessage(chatJid, formatted)) {
             logger.debug(
@@ -463,56 +464,7 @@ function ensureContainerSystemRunning(): void {
   cleanupOrphans();
 }
 
-// ── Process singleton guard (PID file) ──────────────────────────────
-const PID_FILE = path.join(DATA_DIR, 'nanoclaw.pid');
-let pidFd: number | null = null;
-
-function acquirePidLock(): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-
-  // Check for stale PID file from a previous crash
-  if (fs.existsSync(PID_FILE)) {
-    const existingPid = parseInt(fs.readFileSync(PID_FILE, 'utf-8').trim(), 10);
-    if (!isNaN(existingPid) && existingPid !== process.pid) {
-      try {
-        process.kill(existingPid, 0); // signal 0 = check if alive
-        logger.fatal(
-          { existingPid },
-          'Another NanoClaw instance is already running',
-        );
-        process.exit(1);
-      } catch {
-        // Process is dead — stale PID file from a crash, safe to overwrite
-        logger.warn(
-          { existingPid },
-          'Removing stale PID file from previous crash',
-        );
-      }
-    }
-  }
-
-  // Write our PID atomically
-  pidFd = fs.openSync(PID_FILE, 'w');
-  fs.writeSync(pidFd, `${process.pid}\n`);
-  // Keep fd open so the file is held for the process lifetime
-}
-
-function releasePidLock(): void {
-  try {
-    if (pidFd !== null) {
-      fs.closeSync(pidFd);
-      pidFd = null;
-    }
-    if (fs.existsSync(PID_FILE)) {
-      fs.unlinkSync(PID_FILE);
-    }
-  } catch {
-    // Best-effort cleanup
-  }
-}
-
 async function main(): Promise<void> {
-  acquirePidLock();
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');
@@ -521,7 +473,6 @@ async function main(): Promise<void> {
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
-    releasePidLock();
     await queue.shutdown(10000);
     for (const ch of channels) await ch.disconnect();
     process.exit(0);

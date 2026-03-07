@@ -74,7 +74,7 @@ describe('schedule_task authorization', () => {
         type: 'schedule_task',
         prompt: 'do something',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         targetJid: 'other@g.us',
       },
       'whatsapp_main',
@@ -94,7 +94,7 @@ describe('schedule_task authorization', () => {
         type: 'schedule_task',
         prompt: 'self task',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         targetJid: 'other@g.us',
       },
       'other-group',
@@ -113,7 +113,7 @@ describe('schedule_task authorization', () => {
         type: 'schedule_task',
         prompt: 'unauthorized',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         targetJid: 'main@g.us',
       },
       'other-group',
@@ -131,7 +131,7 @@ describe('schedule_task authorization', () => {
         type: 'schedule_task',
         prompt: 'no target',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         targetJid: 'unknown@g.us',
       },
       'whatsapp_main',
@@ -154,7 +154,7 @@ describe('pause_task authorization', () => {
       chat_jid: 'main@g.us',
       prompt: 'main task',
       schedule_type: 'once',
-      schedule_value: '2025-06-01T00:00:00.000Z',
+      schedule_value: '2025-06-01T00:00:00',
       context_mode: 'isolated',
       next_run: '2025-06-01T00:00:00.000Z',
       status: 'active',
@@ -166,7 +166,7 @@ describe('pause_task authorization', () => {
       chat_jid: 'other@g.us',
       prompt: 'other task',
       schedule_type: 'once',
-      schedule_value: '2025-06-01T00:00:00.000Z',
+      schedule_value: '2025-06-01T00:00:00',
       context_mode: 'isolated',
       next_run: '2025-06-01T00:00:00.000Z',
       status: 'active',
@@ -215,7 +215,7 @@ describe('resume_task authorization', () => {
       chat_jid: 'other@g.us',
       prompt: 'paused task',
       schedule_type: 'once',
-      schedule_value: '2025-06-01T00:00:00.000Z',
+      schedule_value: '2025-06-01T00:00:00',
       context_mode: 'isolated',
       next_run: '2025-06-01T00:00:00.000Z',
       status: 'paused',
@@ -254,6 +254,38 @@ describe('resume_task authorization', () => {
   });
 });
 
+// --- task not found (idempotent) ---
+
+describe('task operations on non-existent tasks', () => {
+  it('cancel_task on non-existent task does not throw or warn', async () => {
+    await processTaskIpc(
+      { type: 'cancel_task', taskId: 'task-nonexistent' },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+    // Should not throw - treated as no-op
+  });
+
+  it('pause_task on non-existent task does not throw or warn', async () => {
+    await processTaskIpc(
+      { type: 'pause_task', taskId: 'task-nonexistent' },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+  });
+
+  it('resume_task on non-existent task does not throw or warn', async () => {
+    await processTaskIpc(
+      { type: 'resume_task', taskId: 'task-nonexistent' },
+      'whatsapp_main',
+      true,
+      deps,
+    );
+  });
+});
+
 // --- cancel_task authorization ---
 
 describe('cancel_task authorization', () => {
@@ -264,7 +296,7 @@ describe('cancel_task authorization', () => {
       chat_jid: 'other@g.us',
       prompt: 'cancel me',
       schedule_type: 'once',
-      schedule_value: '2025-06-01T00:00:00.000Z',
+      schedule_value: '2025-06-01T00:00:00',
       context_mode: 'isolated',
       next_run: null,
       status: 'active',
@@ -287,7 +319,7 @@ describe('cancel_task authorization', () => {
       chat_jid: 'other@g.us',
       prompt: 'my task',
       schedule_type: 'once',
-      schedule_value: '2025-06-01T00:00:00.000Z',
+      schedule_value: '2025-06-01T00:00:00',
       context_mode: 'isolated',
       next_run: null,
       status: 'active',
@@ -310,7 +342,7 @@ describe('cancel_task authorization', () => {
       chat_jid: 'main@g.us',
       prompt: 'not yours',
       schedule_type: 'once',
-      schedule_value: '2025-06-01T00:00:00.000Z',
+      schedule_value: '2025-06-01T00:00:00',
       context_mode: 'isolated',
       next_run: null,
       status: 'active',
@@ -565,7 +597,7 @@ describe('schedule_task context_mode', () => {
         type: 'schedule_task',
         prompt: 'group context',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         context_mode: 'group',
         targetJid: 'other@g.us',
       },
@@ -584,7 +616,7 @@ describe('schedule_task context_mode', () => {
         type: 'schedule_task',
         prompt: 'isolated context',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         context_mode: 'isolated',
         targetJid: 'other@g.us',
       },
@@ -603,7 +635,7 @@ describe('schedule_task context_mode', () => {
         type: 'schedule_task',
         prompt: 'bad context',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         context_mode: 'bogus' as any,
         targetJid: 'other@g.us',
       },
@@ -622,7 +654,7 @@ describe('schedule_task context_mode', () => {
         type: 'schedule_task',
         prompt: 'no context mode',
         schedule_type: 'once',
-        schedule_value: '2025-06-01T00:00:00.000Z',
+        schedule_value: '2025-06-01T00:00:00',
         targetJid: 'other@g.us',
       },
       'whatsapp_main',
