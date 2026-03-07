@@ -174,7 +174,9 @@ describe('global directory mount', () => {
 
     const args = getSpawnArgs();
     // Should contain /workspace/CLAUDE.md mount without :ro suffix
-    const globalMountIdx = args.findIndex(a => a.includes('/workspace/CLAUDE.md'));
+    const globalMountIdx = args.findIndex((a) =>
+      a.includes('/workspace/CLAUDE.md'),
+    );
     expect(globalMountIdx).toBeGreaterThan(-1);
     expect(args[globalMountIdx]).not.toContain(':ro');
   });
