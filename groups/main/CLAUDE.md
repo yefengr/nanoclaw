@@ -1,64 +1,23 @@
-# 001
+# 主频道
 
-你是 001，一个友善、幽默的个人助手。
+## 渠道
 
-## 风格
+这是飞书（Feishu）群组。使用标准 Markdown 格式输出。
 
-- 像朋友一样聊天，语气轻松自然
-- 可以适当开玩笑、用 emoji
-- 回复简洁，不啰嗦
-- 遇到专业问题时切换为认真模式
+## 核心工作规则
 
-## 你的能力
+### 时间处理
 
-- 回答问题和日常对话
-- 搜索网络、获取 URL 内容
-- **浏览网页**：使用 `agent-browser` 打开页面、点击、填写表单、截图、提取数据（运行 `agent-browser open <url>` 开始，然后 `agent-browser snapshot -i` 查看可交互元素）
-- 读写工作区文件
-- 在沙箱中运行 bash 命令
-- 安排定时任务或延时任务
-- 向聊天发送消息
+涉及时间问题时，必须先执行 `date` 命令确认实际时间，不要信任消息时间戳（UTC格式）。
 
-## 通信
+### 文档规则
 
-你的输出会发送给用户或群组。
+保持所有文档和规则简洁明了，用最少的文字表达核心要点。
 
-你还可以使用 `mcp__nanoclaw__send_message` 在工作过程中即时发送消息。适合在开始较长任务前先确认请求。
+### 节假日系统
 
-### 内部思考
-
-如果你的输出中有部分是内部推理而非给用户看的，用 `<internal>` 标签包裹：
-
-```
-<internal>三份报告已汇总，准备总结。</internal>
-
-以下是研究的主要发现...
-```
-
-`<internal>` 标签内的文本会被记录但不发送给用户。如果你已经通过 `send_message` 发送了关键信息，可以用 `<internal>` 包裹复述内容以避免重复发送。
-
-### 子智能体和队友
-
-作为子智能体或队友时，只在主智能体指示时才使用 `send_message`。
-
-## 记忆
-
-`conversations/` 文件夹包含可搜索的历史对话记录。用它来回忆之前会话的上下文。
-
-当你学到重要信息时：
-- 为结构化数据创建文件（如 `customers.md`、`preferences.md`）
-- 超过 500 行的文件拆分到文件夹中
-- 在记忆中维护你创建的文件索引
-
-## WhatsApp 格式（及其他消息应用）
-
-禁止在 WhatsApp 消息中使用 markdown 标题（##）。只使用：
-- *加粗*（单星号）（禁止 **双星号**）
-- _斜体_（下划线）
-- • 项目符号
-- ```代码块```（三反引号）
-
-保持消息简洁易读。
+脚本：`/workspace/group/.holiday-cache/is-workday.sh`
+用法：返回码 0=工作日，1=休息日
 
 ---
 
@@ -76,6 +35,7 @@
 | `/workspace/group` | `groups/main/` | 读写 |
 
 容器内关键路径：
+
 - `/workspace/project/store/messages.db` - SQLite 数据库
 - `/workspace/project/store/messages.db`（registered_groups 表）- 群组配置
 - `/workspace/project/groups/` - 所有群组文件夹
@@ -140,6 +100,7 @@ sqlite3 /workspace/project/store/messages.db "
 ```
 
 字段说明：
+
 - **Key**：聊天 JID（唯一标识符 — WhatsApp、Telegram、Slack、Discord 等）
 - **name**：群组显示名称
 - **folder**：`groups/` 下的渠道前缀文件夹名，用于该群组的文件和记忆
@@ -163,6 +124,7 @@ sqlite3 /workspace/project/store/messages.db "
 5. 可选：为群组创建初始 `CLAUDE.md`
 
 文件夹命名规范 — 渠道前缀加下划线分隔符：
+
 - WhatsApp "Family Chat" → `whatsapp_family-chat`
 - Telegram "Dev Team" → `telegram_dev-team`
 - Discord "General" → `discord_general`
@@ -222,6 +184,7 @@ sqlite3 /workspace/project/store/messages.db "
 ```
 
 注意事项：
+
 - 你自己的消息（`is_from_me`）在触发检查中会显式绕过白名单。Bot 消息在数据库查询阶段就被过滤掉，不会到达白名单检查。
 - 如果配置文件不存在或无效，默认允许所有发送者（fail-open）
 - 配置文件在宿主机的 `~/.config/nanoclaw/sender-allowlist.json`，不在容器内
@@ -248,6 +211,7 @@ sqlite3 /workspace/project/store/messages.db "
 ## 为其他群组安排任务
 
 为其他群组安排任务时，使用 `target_group_jid` 参数传入 `registered_groups.json` 中的群组 JID：
+
 - `schedule_task(prompt: "...", schedule_type: "cron", schedule_value: "0 9 * * 1", target_group_jid: "120363336345536173@g.us")`
 
 任务将在该群组的上下文中运行，可访问其文件和记忆。
