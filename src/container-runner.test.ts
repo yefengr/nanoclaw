@@ -137,10 +137,19 @@ describe('global directory mount', () => {
     });
 
     const input = { ...testInput, isMain };
-    const promise = runContainerAgent(testGroup, input, () => {}, async () => {});
+    const promise = runContainerAgent(
+      testGroup,
+      input,
+      () => {},
+      async () => {},
+    );
 
     // Immediately close to resolve the promise
-    emitOutputMarker(fakeProc, { status: 'success', result: 'ok', newSessionId: 'sid' });
+    emitOutputMarker(fakeProc, {
+      status: 'success',
+      result: 'ok',
+      newSessionId: 'sid',
+    });
     return promise;
   }
 
