@@ -204,7 +204,7 @@ sqlite3 /workspace/project/store/messages.db "
 
 ## 全局记忆
 
-你可以读写 `/workspace/project/groups/global/CLAUDE.md` 来存储应适用于所有群组的信息。只在用户明确要求"全局记住这个"或类似请求时才更新全局记忆。
+你可以读写 `/workspace/CLAUDE.md` 来存储应适用于所有群组的信息。只在用户明确要求"全局记住这个"或类似请求时才更新全局记忆。
 
 ---
 

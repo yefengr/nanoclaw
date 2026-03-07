@@ -11,14 +11,12 @@ logs/
 
 # Groups - only track base structure and specific CLAUDE.md files
 groups/*
+!groups/CLAUDE.md
 !groups/main/
-!groups/global/
 !groups/feishu_main/
 groups/main/*
-groups/global/*
 groups/feishu_main/*
 !groups/main/CLAUDE.md
-!groups/global/CLAUDE.md
 !groups/feishu_main/CLAUDE.md
 
 # Secrets
