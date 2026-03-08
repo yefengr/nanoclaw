@@ -223,6 +223,7 @@ function readSecrets(): Record<string, string> {
     'ANTHROPIC_BASE_URL',
     'ANTHROPIC_AUTH_TOKEN',
     'ANTHROPIC_MODEL',
+    'QIANFAN_API_KEY',
   ]);
 }
 
