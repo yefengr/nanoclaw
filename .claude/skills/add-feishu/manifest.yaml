@@ -1,5 +1,5 @@
 skill: feishu
-version: 1.0.0
+version: 1.0.1
 description: "Feishu (Lark) integration via official Node SDK with WebSocket"
 core_version: 1.1.6
 adds:
@@ -10,6 +10,7 @@ modifies:
   - src/types.ts
   - src/ipc.ts
   - src/index.ts
+  - src/container-runner.ts
   - container/agent-runner/src/ipc-mcp-stdio.ts
 structured:
   npm_dependencies:

@@ -571,7 +571,9 @@ export class FeishuChannel implements Channel {
         default: {
           // 'file' and 'video' (video downgrades to file since media type needs cover image)
           const fname = media.filename || path.basename(media.filePath);
-          const fileType = extensionToFeishuFileType(fname);
+          const fileType = media.type === 'video'
+            ? 'stream'
+            : extensionToFeishuFileType(fname);
           const resp = await this.client.im.v1.file.create({
             data: {
               file_type: fileType,
