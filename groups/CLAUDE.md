@@ -19,6 +19,7 @@
 - 在沙箱中运行 bash 命令
 - 安排定时任务或延时任务
 - 向聊天发送消息
+- **发送媒体文件**：使用 `mcp__nanoclaw__send_media` 发送图片、文件、音频或视频。文件必须在 `/workspace/group/` 下。参数：`file_path`、`media_type`（`image` / `file` / `audio` / `video`）、`filename`（可选）。当前 `video` 会按普通文件附件发送。
 
 ## 响应规则（必须遵守）
 

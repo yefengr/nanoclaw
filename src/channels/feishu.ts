@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import * as Lark from '@larksuiteoapi/node-sdk';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
@@ -6,6 +8,7 @@ import { logger } from '../logger.js';
 import { registerChannel, ChannelOpts } from './registry.js';
 import {
   Channel,
+  MediaPayload,
   OnChatMetadata,
   OnInboundMessage,
   RegisteredGroup,
@@ -24,6 +27,32 @@ function markdownToMdPost(text: string): string {
       content: [[{ tag: 'md', text }]],
     },
   });
+}
+
+function extensionToFeishuFileType(
+  filename: string,
+): 'opus' | 'mp4' | 'pdf' | 'doc' | 'xls' | 'ppt' | 'stream' {
+  const ext = path.extname(filename).toLowerCase();
+  switch (ext) {
+    case '.opus':
+    case '.ogg':
+      return 'opus';
+    case '.mp4':
+      return 'mp4';
+    case '.pdf':
+      return 'pdf';
+    case '.doc':
+    case '.docx':
+      return 'doc';
+    case '.xls':
+    case '.xlsx':
+      return 'xls';
+    case '.ppt':
+    case '.pptx':
+      return 'ppt';
+    default:
+      return 'stream';
+  }
 }
 
 export interface FeishuChannelOpts {
@@ -361,6 +390,100 @@ export class FeishuChannel implements Channel {
       }
     } catch (err) {
       logger.error({ jid, err }, 'Failed to send Feishu message');
+    }
+  }
+
+  async sendMedia(jid: string, media: MediaPayload): Promise<void> {
+    if (!this.wsClient) {
+      logger.warn('Feishu bot not initialized');
+      return;
+    }
+
+    const chatId = jid.replace(/^feishu:/, '');
+
+    try {
+      switch (media.type) {
+        case 'image': {
+          const resp = await this.client.im.v1.image.create({
+            data: {
+              image_type: 'message',
+              image: fs.createReadStream(media.filePath),
+            },
+          } as any);
+          const imageKey =
+            (resp as any)?.image_key || (resp as any)?.data?.image_key;
+          if (!imageKey) {
+            logger.error({ jid }, 'Image upload returned no key');
+            return;
+          }
+          await this.client.im.v1.message.create({
+            params: { receive_id_type: 'chat_id' },
+            data: {
+              receive_id: chatId,
+              content: JSON.stringify({ image_key: imageKey }),
+              msg_type: 'image',
+            },
+          });
+          logger.info({ jid, imageKey }, 'Feishu image sent');
+          break;
+        }
+        case 'audio': {
+          const resp = await this.client.im.v1.file.create({
+            data: {
+              file_type: 'opus',
+              file_name: media.filename || 'audio.opus',
+              file: fs.createReadStream(media.filePath),
+            },
+          } as any);
+          const fileKey =
+            (resp as any)?.file_key || (resp as any)?.data?.file_key;
+          if (!fileKey) {
+            logger.error({ jid }, 'Audio upload returned no key');
+            return;
+          }
+          await this.client.im.v1.message.create({
+            params: { receive_id_type: 'chat_id' },
+            data: {
+              receive_id: chatId,
+              content: JSON.stringify({ file_key: fileKey }),
+              msg_type: 'audio',
+            },
+          });
+          logger.info({ jid, fileKey }, 'Feishu audio sent');
+          break;
+        }
+        default: {
+          const filename = media.filename || path.basename(media.filePath);
+          const fileType =
+            media.type === 'video'
+              ? 'stream'
+              : extensionToFeishuFileType(filename);
+          const resp = await this.client.im.v1.file.create({
+            data: {
+              file_type: fileType,
+              file_name: filename,
+              file: fs.createReadStream(media.filePath),
+            },
+          } as any);
+          const fileKey =
+            (resp as any)?.file_key || (resp as any)?.data?.file_key;
+          if (!fileKey) {
+            logger.error({ jid }, 'File upload returned no key');
+            return;
+          }
+          await this.client.im.v1.message.create({
+            params: { receive_id_type: 'chat_id' },
+            data: {
+              receive_id: chatId,
+              content: JSON.stringify({ file_key: fileKey }),
+              msg_type: 'file',
+            },
+          });
+          logger.info({ jid, fileKey, fileType }, 'Feishu file sent');
+        }
+      }
+    } catch (err) {
+      logger.error({ jid, err }, 'Failed to send media');
     }
   }
 

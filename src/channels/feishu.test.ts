@@ -7,6 +7,16 @@ vi.mock('../config.js', () => ({
   TRIGGER_PATTERN: /^@Andy\b/i,
 }));
 
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    default: {
+      ...actual,
+      createReadStream: vi.fn(() => 'mock-stream'),
+    },
+  };
+});
+
 vi.mock('../logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -37,6 +47,12 @@ vi.mock('@larksuiteoapi/node-sdk', () => {
       v1: {
         message: {
           create: vi.fn().mockResolvedValue({}),
+        },
+        image: {
+          create: vi.fn().mockResolvedValue({ image_key: 'img_uploaded_123' }),
+        },
+        file: {
+          create: vi.fn().mockResolvedValue({ file_key: 'file_uploaded_456' }),
         },
         chat: {
           get: vi.fn().mockResolvedValue({ name: 'Test Group' }),
@@ -791,6 +807,107 @@ describe('FeishuChannel', () => {
       if (currentClient()) {
         expect(currentClient().im.v1.message.create).not.toHaveBeenCalled();
       }
+    });
+  });
+
+  describe('sendMedia', () => {
+    it('sends image media via upload API', async () => {
+      const opts = createTestOpts();
+      const channel = new FeishuChannel('app_id', 'app_secret', opts);
+      await channel.connect();
+
+      await channel.sendMedia('feishu:oc_test123', {
+        type: 'image',
+        filePath: '/tmp/test-image.jpg',
+        filename: 'test-image.jpg',
+      });
+
+      expect(currentClient().im.v1.image.create).toHaveBeenCalled();
+      expect(currentClient().im.v1.message.create).toHaveBeenCalledWith({
+        params: { receive_id_type: 'chat_id' },
+        data: {
+          receive_id: 'oc_test123',
+          content: JSON.stringify({ image_key: 'img_uploaded_123' }),
+          msg_type: 'image',
+        },
+      });
+    });
+
+    it('sends audio media via file upload API', async () => {
+      const opts = createTestOpts();
+      const channel = new FeishuChannel('app_id', 'app_secret', opts);
+      await channel.connect();
+
+      await channel.sendMedia('feishu:oc_test123', {
+        type: 'audio',
+        filePath: '/tmp/test-audio.opus',
+        filename: 'voice.opus',
+      });
+
+      expect(currentClient().im.v1.file.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            file_type: 'opus',
+            file_name: 'voice.opus',
+          }),
+        }),
+      );
+      expect(currentClient().im.v1.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            receive_id: 'oc_test123',
+            content: JSON.stringify({ file_key: 'file_uploaded_456' }),
+            msg_type: 'audio',
+          }),
+        }),
+      );
+    });
+
+    it('sends video as a regular file attachment', async () => {
+      const opts = createTestOpts();
+      const channel = new FeishuChannel('app_id', 'app_secret', opts);
+      await channel.connect();
+
+      await channel.sendMedia('feishu:oc_test123', {
+        type: 'video',
+        filePath: '/tmp/test-video.mp4',
+        filename: 'clip.mp4',
+      });
+
+      expect(currentClient().im.v1.file.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            file_type: 'stream',
+            file_name: 'clip.mp4',
+          }),
+        }),
+      );
+      expect(currentClient().im.v1.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            receive_id: 'oc_test123',
+            content: JSON.stringify({ file_key: 'file_uploaded_456' }),
+            msg_type: 'file',
+          }),
+        }),
+      );
+    });
+
+    it('handles upload failures gracefully', async () => {
+      const opts = createTestOpts();
+      const channel = new FeishuChannel('app_id', 'app_secret', opts);
+      await channel.connect();
+
+      currentClient().im.v1.image.create.mockRejectedValueOnce(
+        new Error('Upload failed'),
+      );
+
+      await expect(
+        channel.sendMedia('feishu:oc_test123', {
+          type: 'image',
+          filePath: '/tmp/test-image.jpg',
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 
