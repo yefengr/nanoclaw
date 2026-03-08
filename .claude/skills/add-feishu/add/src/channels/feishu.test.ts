@@ -958,7 +958,7 @@ describe('FeishuChannel', () => {
       });
     });
 
-    it('sends video as file (downgrades)', async () => {
+    it('sends video as a regular file attachment', async () => {
       const opts = createTestOpts();
       const channel = new FeishuChannel('app_id', 'app_secret', opts);
       await channel.connect();
@@ -969,11 +969,11 @@ describe('FeishuChannel', () => {
         filename: 'clip.mp4',
       });
 
-      // Should upload as mp4 file
+      // Should upload as a regular file attachment to avoid type mismatch
       expect(currentClient().im.v1.file.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            file_type: 'mp4',
+            file_type: 'stream',
             file_name: 'clip.mp4',
           }),
         }),

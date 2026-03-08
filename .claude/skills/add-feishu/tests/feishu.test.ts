@@ -11,8 +11,9 @@ describe('feishu skill package', () => {
 
     const content = fs.readFileSync(manifestPath, 'utf-8');
     expect(content).toContain('skill: feishu');
-    expect(content).toContain('version: 1.0.0');
+    expect(content).toContain('version: 1.0.1');
     expect(content).toContain('@larksuiteoapi/node-sdk');
+    expect(content).toContain('src/container-runner.ts');
   });
 
   it('has all files declared in adds', () => {
@@ -57,6 +58,18 @@ describe('feishu skill package', () => {
 
     const indexContent = fs.readFileSync(indexFile, 'utf-8');
     expect(indexContent).toContain("import './feishu.js'");
+
+    const containerRunnerFile = path.join(
+      skillDir,
+      'modify',
+      'src',
+      'container-runner.ts',
+    );
+    expect(fs.existsSync(containerRunnerFile)).toBe(true);
+
+    const containerRunnerContent = fs.readFileSync(containerRunnerFile, 'utf-8');
+    expect(containerRunnerContent).toContain('agent-runner-src');
+    expect(containerRunnerContent).toContain('force: true');
   });
 
   it('has intent files for modified files', () => {
@@ -65,6 +78,35 @@ describe('feishu skill package', () => {
         path.join(skillDir, 'modify', 'src', 'channels', 'index.ts.intent.md'),
       ),
     ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(skillDir, 'modify', 'src', 'container-runner.ts.intent.md'),
+      ),
+    ).toBe(true);
+  });
+
+  it('uses media_type for send_media and regular-file video fallback', () => {
+    const mcpFile = path.join(
+      skillDir,
+      'modify',
+      'container',
+      'agent-runner',
+      'src',
+      'ipc-mcp-stdio.ts',
+    );
+    const mcpContent = fs.readFileSync(mcpFile, 'utf-8');
+    expect(mcpContent).toContain('media_type');
+
+    const channelFile = path.join(
+      skillDir,
+      'add',
+      'src',
+      'channels',
+      'feishu.ts',
+    );
+    const channelContent = fs.readFileSync(channelFile, 'utf-8');
+    expect(channelContent).toContain("media.type === 'video'");
+    expect(channelContent).toContain("? 'stream'");
   });
 
   it('has SKILL.md with setup instructions', () => {

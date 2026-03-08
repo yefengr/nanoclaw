@@ -41,16 +41,37 @@ Or call `initSkillsSystem()` from `skills-engine/migrate.ts`.
 npx tsx scripts/apply-skill.ts .claude/skills/add-feishu
 ```
 
-This deterministically:
+This applies the skill in two ways:
 - Adds `src/channels/feishu.ts` (FeishuChannel class with self-registration via `registerChannel`)
 - Adds `src/channels/feishu.test.ts` (comprehensive unit tests)
-- Appends `import './feishu.js'` to the channel barrel file `src/channels/index.ts`
+- Merges `modify/` files into the current branch using three-way merge instead of overwriting them
 - Installs the `@larksuiteoapi/node-sdk` npm dependency
 - Updates `.env.example` with `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
 - Records the application in `.nanoclaw/state.yaml`
 
+`modify/` files are merge inputs, not authoritative replacements. Preserve unrelated host changes in the target files.
+
 If the apply reports merge conflicts, read the intent file:
 - `modify/src/channels/index.ts.intent.md` — what changed and invariants
+- `modify/src/container-runner.ts.intent.md` — why agent-runner source sync must be updated
+
+### Updating this skill when main has moved
+
+If the target branch has fallen behind `main`, do not blindly rewrite files under `modify/`.
+
+Use the drift-fix workflow first:
+
+```bash
+npx tsx scripts/fix-skill-drift.ts add-feishu
+```
+
+That refreshes `modify/` files by three-way merging the skill snapshots with the latest mainline code. After that:
+
+1. Review any conflict markers left in the skill package
+2. Apply the real behavior changes needed by this skill
+3. Re-run the skill package tests
+
+This keeps the skill package compatible with new host-side features that may have been added after the skill branch diverged.
 
 ### Validate code changes
 
@@ -276,8 +297,10 @@ The Feishu channel supports sending and receiving media files:
 - The agent can send media files using the `send_media` MCP tool
 - Supported types: `image`, `file`, `audio`, `video`
 - Files must be under `/workspace/group/` in the container
+- The MCP tool uses `media_type` as the parameter name
 - Images are uploaded via `image.create`, files/audio/video via `file.create`
-- Video is sent as a file (Feishu's `media` msg_type requires a cover image)
+- Video is currently sent as a regular file attachment, not a native Feishu video message
+- To avoid Feishu error `230055`, video uploads use regular file upload semantics before sending a `file` message
 
 **Required permission:** `im:resource` (for both downloading user media and uploading files)
 

@@ -9,3 +9,4 @@ These additions enable channels to send media files (images, files, audio, video
 - All existing interfaces and types remain unchanged
 - `sendMedia` is optional — channels that don't support media simply omit it
 - `MediaPayload.type` is a union of `'image' | 'file' | 'audio' | 'video'`
+- Do not refactor unrelated types or reorder host-specific interfaces without need

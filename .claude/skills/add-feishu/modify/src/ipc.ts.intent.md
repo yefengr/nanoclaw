@@ -15,3 +15,4 @@ Add `sendMedia` as an optional dependency in `IpcDeps` and handle `data.media` i
 - Path traversal (`..`) is rejected
 - Authorization check (isMain or same group) is applied before media sending, same as text
 - Container paths are translated to host paths using the validated group folder resolver
+- Preserve any existing task, snapshot, and host-specific IPC behavior outside the new media branch
