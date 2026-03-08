@@ -224,6 +224,7 @@ function readSecrets(): Record<string, string> {
     'ANTHROPIC_AUTH_TOKEN',
     'ANTHROPIC_MODEL',
     'QIANFAN_API_KEY',
+    'QWEATHER_API_KEY',
   ]);
 }
 
