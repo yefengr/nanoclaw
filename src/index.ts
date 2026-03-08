@@ -608,7 +608,10 @@ async function main(): Promise<void> {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
       if (!channel.sendMedia) {
-        logger.warn({ jid, channel: channel.name }, 'Channel does not support media sending');
+        logger.warn(
+          { jid, channel: channel.name },
+          'Channel does not support media sending',
+        );
         return Promise.resolve();
       }
       return channel.sendMedia(jid, media);
