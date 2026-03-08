@@ -77,12 +77,19 @@ export interface TaskRunLog {
   error: string | null;
 }
 
+export interface MediaPayload {
+  type: 'image' | 'file' | 'audio' | 'video';
+  filePath: string;
+  filename?: string;
+}
+
 // --- Channel abstraction ---
 
 export interface Channel {
   name: string;
   connect(): Promise<void>;
   sendMessage(jid: string, text: string): Promise<void>;
+  sendMedia?(jid: string, media: MediaPayload): Promise<void>;
   isConnected(): boolean;
   ownsJid(jid: string): boolean;
   disconnect(): Promise<void>;

@@ -63,6 +63,54 @@ server.tool(
 );
 
 server.tool(
+  'send_media',
+  'Send a media file (image, file, audio, or video) to the user or group. The file must be under /workspace/group/. Use this to send images, documents, audio clips, or videos. Note: video currently sends as a regular file attachment.',
+  {
+    file_path: z.string().describe('Absolute path to the file, must be under /workspace/group/'),
+    media_type: z.enum(['image', 'file', 'audio', 'video']).describe('Media type: image, file, audio, or video. Video currently sends as a regular file attachment.'),
+    filename: z.string().optional().describe('Display filename (defaults to basename of file_path)'),
+  },
+  async (args) => {
+    if (!args.file_path.startsWith('/workspace/group/')) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: file_path must be under /workspace/group/' }],
+        isError: true,
+      };
+    }
+
+    if (args.file_path.includes('..')) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: file_path must not contain ".."' }],
+        isError: true,
+      };
+    }
+
+    if (!fs.existsSync(args.file_path)) {
+      return {
+        content: [{ type: 'text' as const, text: `Error: file not found: ${args.file_path}` }],
+        isError: true,
+      };
+    }
+
+    const data = {
+      type: 'message',
+      chatJid,
+      media: {
+        type: args.media_type,
+        path: args.file_path,
+        filename: args.filename || path.basename(args.file_path),
+      },
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    };
+
+    writeIpcFile(MESSAGES_DIR, data);
+
+    return { content: [{ type: 'text' as const, text: 'Media sent.' }] };
+  },
+);
+
+server.tool(
   'schedule_task',
   `Schedule a recurring or one-time task. The task will run as a full agent with access to all tools. Returns the task ID for future reference. To modify an existing task, use update_task instead.
 

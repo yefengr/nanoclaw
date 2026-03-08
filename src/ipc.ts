@@ -12,12 +12,13 @@ import {
   getTaskById,
   updateTask,
 } from './db.js';
-import { isValidGroupFolder } from './group-folder.js';
+import { isValidGroupFolder, resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
-import { RegisteredGroup } from './types.js';
+import { MediaPayload, RegisteredGroup } from './types.js';
 
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
+  sendMedia?: (jid: string, media: MediaPayload) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   syncGroups: (force: boolean) => Promise<void>;
@@ -79,18 +80,51 @@ export function startIpcWatcher(deps: IpcDeps): void {
             const filePath = path.join(messagesDir, file);
             try {
               const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-              if (data.type === 'message' && data.chatJid && data.text) {
+              if (data.type === 'message' && data.chatJid) {
                 // Authorization: verify this group can send to this chatJid
                 const targetGroup = registeredGroups[data.chatJid];
                 if (
                   isMain ||
                   (targetGroup && targetGroup.folder === sourceGroup)
                 ) {
-                  await deps.sendMessage(data.chatJid, data.text);
-                  logger.info(
-                    { chatJid: data.chatJid, sourceGroup },
-                    'IPC message sent',
-                  );
+                  if (data.media?.path && deps.sendMedia) {
+                    const mediaPath = data.media.path;
+                    if (mediaPath.includes('..')) {
+                      logger.warn(
+                        { chatJid: data.chatJid, mediaPath, sourceGroup },
+                        'Rejected IPC media path with traversal',
+                      );
+                    } else {
+                      const relativePath = mediaPath.replace(
+                        /^\/workspace\/group\//,
+                        '',
+                      );
+                      const hostPath = path.join(
+                        resolveGroupFolderPath(sourceGroup),
+                        relativePath,
+                      );
+                      await deps.sendMedia(data.chatJid, {
+                        type: data.media.type,
+                        filePath: hostPath,
+                        filename:
+                          data.media.filename || path.basename(hostPath),
+                      });
+                      logger.info(
+                        {
+                          chatJid: data.chatJid,
+                          sourceGroup,
+                          mediaType: data.media.type,
+                        },
+                        'IPC media sent',
+                      );
+                    }
+                  } else if (data.text) {
+                    await deps.sendMessage(data.chatJid, data.text);
+                    logger.info(
+                      { chatJid: data.chatJid, sourceGroup },
+                      'IPC message sent',
+                    );
+                  }
                 } else {
                   logger.warn(
                     { chatJid: data.chatJid, sourceGroup },
