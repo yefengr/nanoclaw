@@ -13,3 +13,4 @@ Wire the `sendMedia` callback into the `startIpcWatcher` deps so the IPC watcher
 **Invariants:**
 - All existing IPC deps remain unchanged
 - Channels without `sendMedia` gracefully skip (no crash)
+- Preserve unrelated startup, scheduler, routing, and queue logic in `src/index.ts`

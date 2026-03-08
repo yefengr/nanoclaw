@@ -8,4 +8,5 @@
 - `04-download-file.md`
 - `05-message-resource-get.md`
 
+说明：当前技能包将 `video` 按普通文件附件发送；本目录不包含 `im/v1/message/create` 的原生视频消息规范。
 
