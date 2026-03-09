@@ -62,7 +62,11 @@ function extensionToFeishuFileType(
 function resolveMediaInfo(
   msgType: string,
   parsed: any,
-): { fileKey: string; resourceType: 'image' | 'file'; filename: string } | null {
+): {
+  fileKey: string;
+  resourceType: 'image' | 'file';
+  filename: string;
+} | null {
   switch (msgType) {
     case 'image': {
       const imageKey = parsed.image_key;
@@ -313,7 +317,10 @@ export class FeishuChannel implements Channel {
       const mediaDir = path.join(GROUPS_DIR, groupFolder, 'media');
       fs.mkdirSync(mediaDir, { recursive: true });
 
-      const safeFilename = `${msgId}_${filename}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const safeFilename = `${msgId}_${filename}`.replace(
+        /[^a-zA-Z0-9._-]/g,
+        '_',
+      );
       const savePath = path.join(mediaDir, safeFilename);
 
       const resp = await Promise.race([
