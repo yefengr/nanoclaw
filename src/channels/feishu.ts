@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import * as Lark from '@larksuiteoapi/node-sdk';
 
-import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
+import { ASSISTANT_NAME, GROUPS_DIR, TRIGGER_PATTERN } from '../config.js';
 import { readEnvFile } from '../env.js';
 import { logger } from '../logger.js';
 import { registerChannel, ChannelOpts } from './registry.js';
@@ -52,6 +52,68 @@ function extensionToFeishuFileType(
       return 'ppt';
     default:
       return 'stream';
+  }
+}
+
+/**
+ * Resolve media info from incoming message content.
+ * Returns the file key, resource type, and filename for downloading.
+ */
+function resolveMediaInfo(
+  msgType: string,
+  parsed: any,
+): { fileKey: string; resourceType: 'image' | 'file'; filename: string } | null {
+  switch (msgType) {
+    case 'image': {
+      const imageKey = parsed.image_key;
+      if (!imageKey) return null;
+      return {
+        fileKey: imageKey,
+        resourceType: 'image',
+        filename: `${imageKey}.jpg`,
+      };
+    }
+    case 'file': {
+      const fileKey = parsed.file_key;
+      if (!fileKey) return null;
+      return {
+        fileKey,
+        resourceType: 'file',
+        filename: parsed.file_name || 'file',
+      };
+    }
+    case 'audio': {
+      const fileKey = parsed.file_key;
+      if (!fileKey) return null;
+      return { fileKey, resourceType: 'file', filename: 'audio.opus' };
+    }
+    case 'media': {
+      const fileKey = parsed.file_key;
+      if (!fileKey) return null;
+      return {
+        fileKey,
+        resourceType: 'file',
+        filename: parsed.file_name || 'video.mp4',
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+/** Media type label for agent content */
+function mediaTypeLabel(msgType: string): string {
+  switch (msgType) {
+    case 'image':
+      return 'Image';
+    case 'file':
+      return 'File';
+    case 'audio':
+      return 'Audio';
+    case 'media':
+      return 'Video';
+    default:
+      return 'File';
   }
 }
 
@@ -196,6 +258,29 @@ export class FeishuChannel implements Channel {
       return;
     }
 
+    // Try to download media for supported message types
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch {
+      parsed = {};
+    }
+
+    const mediaInfo = resolveMediaInfo(msgType, parsed);
+    if (mediaInfo) {
+      const containerPath = await this.downloadMessageResource(
+        msgId,
+        mediaInfo.fileKey,
+        mediaInfo.resourceType,
+        group.folder,
+        mediaInfo.filename,
+      );
+      if (containerPath) {
+        content = `[${mediaTypeLabel(msgType)}: ${containerPath}]`;
+      }
+      // If download fails, keep the original placeholder content
+    }
+
     // Deliver message
     this.opts.onMessage(chatJid, {
       id: msgId,
@@ -211,6 +296,51 @@ export class FeishuChannel implements Channel {
       { chatJid, chatName, sender: senderName },
       'Feishu message stored',
     );
+  }
+
+  /**
+   * Download a media resource from a user message using messageResource.get.
+   * Returns the container path if successful, null otherwise.
+   */
+  private async downloadMessageResource(
+    msgId: string,
+    fileKey: string,
+    resourceType: 'image' | 'file',
+    groupFolder: string,
+    filename: string,
+  ): Promise<string | null> {
+    try {
+      const mediaDir = path.join(GROUPS_DIR, groupFolder, 'media');
+      fs.mkdirSync(mediaDir, { recursive: true });
+
+      const safeFilename = `${msgId}_${filename}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const savePath = path.join(mediaDir, safeFilename);
+
+      const resp = await Promise.race([
+        this.client.im.v1.messageResource.get({
+          path: { message_id: msgId, file_key: fileKey },
+          params: { type: resourceType },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Media download timeout')), 10_000),
+        ),
+      ]);
+
+      await (resp as any).writeFile(savePath);
+
+      const containerPath = `/workspace/group/media/${safeFilename}`;
+      logger.info(
+        { msgId, fileKey, savePath, containerPath },
+        'Media resource downloaded',
+      );
+      return containerPath;
+    } catch (err) {
+      logger.warn(
+        { msgId, fileKey, err },
+        'Failed to download media resource, using placeholder',
+      );
+      return null;
+    }
   }
 
   private extractContent(
