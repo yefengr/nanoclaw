@@ -26,6 +26,7 @@ import {
   stopContainer,
 } from './container-runtime.js';
 import { detectAuthMode } from './credential-proxy.js';
+import { readContainerEnvFile } from './container-env.js';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
 
@@ -83,6 +84,16 @@ function buildVolumeMounts(
       mounts.push({
         hostPath: '/dev/null',
         containerPath: '/workspace/project/.env',
+        readonly: true,
+      });
+    }
+
+    // Shadow .env.container too (secrets injected via -e, not file access)
+    const containerEnvFile = path.join(projectRoot, '.env.container');
+    if (fs.existsSync(containerEnvFile)) {
+      mounts.push({
+        hostPath: '/dev/null',
+        containerPath: '/workspace/project/.env.container',
         readonly: true,
       });
     }
@@ -242,6 +253,12 @@ function buildContainerArgs(
     args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
   } else {
     args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
+  }
+
+  // Inject user-defined container environment variables from .env.container
+  const containerEnv = readContainerEnvFile();
+  for (const [key, value] of Object.entries(containerEnv)) {
+    args.push('-e', `${key}=${value}`);
   }
 
   // Runtime-specific args for host gateway resolution
