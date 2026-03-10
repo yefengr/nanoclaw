@@ -5,13 +5,19 @@ description: Add Feishu (Lark) as a channel. Uses WebSocket long connection mode
 
 # Add Feishu Channel
 
-This skill adds Feishu (飞书) support to NanoClaw using the skills engine for deterministic code changes, then walks through interactive setup.
+This skill adds Feishu (飞书) support to NanoClaw, then walks through interactive setup.
 
 ## Phase 1: Pre-flight
 
 ### Check if already applied
 
-Read `.nanoclaw/state.yaml`. If `feishu` is in `applied_skills`, skip to Phase 3 (Setup). The code changes are already in place.
+Check if `src/channels/feishu.ts` exists:
+
+```bash
+test -f src/channels/feishu.ts && echo "Already applied" || echo "Not applied"
+```
+
+If already applied, skip to Phase 3 (Setup).
 
 ### Ask the user
 
@@ -23,55 +29,12 @@ If they have credentials, collect them now. If not, we'll create the app in Phas
 
 ## Phase 2: Apply Code Changes
 
-Run the skills engine to apply this skill's code package. The package files are in this directory alongside this SKILL.md.
+Feishu is a local channel skill. The code lives directly in the `mymain` branch:
+- `src/channels/feishu.ts` (FeishuChannel class with self-registration via `registerChannel`)
+- `src/channels/feishu.test.ts` (comprehensive unit tests)
+- `@larksuiteoapi/node-sdk` npm dependency
 
-### Initialize skills system (if needed)
-
-If `.nanoclaw/` directory doesn't exist yet:
-
-```bash
-npx tsx scripts/apply-skill.ts --init
-```
-
-Or call `initSkillsSystem()` from `skills-engine/migrate.ts`.
-
-### Apply the skill
-
-```bash
-npx tsx scripts/apply-skill.ts .claude/skills/add-feishu
-```
-
-This applies the skill in two ways:
-- Adds `src/channels/feishu.ts` (FeishuChannel class with self-registration via `registerChannel`)
-- Adds `src/channels/feishu.test.ts` (comprehensive unit tests)
-- Merges `modify/` files into the current branch using three-way merge instead of overwriting them
-- Installs the `@larksuiteoapi/node-sdk` npm dependency
-- Updates `.env.example` with `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
-- Records the application in `.nanoclaw/state.yaml`
-
-`modify/` files are merge inputs, not authoritative replacements. Preserve unrelated host changes in the target files.
-
-If the apply reports merge conflicts, read the intent file:
-- `modify/src/channels/index.ts.intent.md` — what changed and invariants
-- `modify/src/container-runner.ts.intent.md` — why agent-runner source sync must be updated
-
-### Updating this skill when main has moved
-
-If the target branch has fallen behind `main`, do not blindly rewrite files under `modify/`.
-
-Use the drift-fix workflow first:
-
-```bash
-npx tsx scripts/fix-skill-drift.ts add-feishu
-```
-
-That refreshes `modify/` files by three-way merging the skill snapshots with the latest mainline code. After that:
-
-1. Review any conflict markers left in the skill package
-2. Apply the real behavior changes needed by this skill
-3. Re-run the skill package tests
-
-This keeps the skill package compatible with new host-side features that may have been added after the skill branch diverged.
+If the files are missing, they need to be restored from git history or re-implemented.
 
 ### Validate code changes
 
@@ -310,10 +273,9 @@ If you already have the Feishu skill applied and want to add media support:
 
 1. Add the `im:resource` permission in the Feishu open platform
 2. Create a new app version and get it approved
-3. Re-apply the skill: `npx tsx scripts/apply-skill.ts .claude/skills/add-feishu`
-4. Rebuild: `npm run build`
-5. Rebuild container: `./container/build.sh`
-6. Restart the service
+3. Rebuild: `npm run build`
+4. Rebuild container: `./container/build.sh`
+5. Restart the service
 
 ## Troubleshooting
 
