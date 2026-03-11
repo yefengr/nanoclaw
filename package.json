@@ -16,7 +16,9 @@
     "setup": "tsx setup/index.ts",
     "auth": "tsx src/whatsapp-auth.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bundle": "node esbuild.config.mjs",
+    "release": "bash scripts/build-release.sh"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
@@ -30,6 +32,7 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^4.0.18",
+    "esbuild": "^0.25.12",
     "husky": "^9.1.7",
     "prettier": "^3.8.1",
     "tsx": "^4.19.0",
