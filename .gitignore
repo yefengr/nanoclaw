@@ -22,7 +22,7 @@ groups/feishu_main/*
 # Secrets
 *.keys.json
 .env
-.env.container
+.env.*
 
 # Temp files
 .tmp-*
