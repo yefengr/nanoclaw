@@ -22,10 +22,15 @@
 
 保持所有文档和规则简洁明了，用最少的文字表达核心要点。
 
+### 回复风格
+
+默认不使用 emoji，除非用户明确要求或场景特别适合。
+
 ### 节假日系统
 
-脚本：`/workspace/group/.holiday-cache/is-workday.sh`
-用法：返回码 0=工作日，1=休息日
+脚本：`/workspace/group/is_workday.py`
+用法：返回码 0=工作日，1=休息日，2=错误
+支持可选参数：`python3 /workspace/group/is_workday.py 2026-03-15`
 
 ---
 
